@@ -2,6 +2,9 @@
 
 Parallel random forests and decision trees implementaiton to study parallelization speedup of these processes.
 
+A decision tree is a supervised learning model used for classification or regression.
+It recursively splits data based on features to reduce impurity (i.e., make child nodes more homogeneous).
+
 ---
 
 ## Dependencies

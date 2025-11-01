@@ -17,10 +17,6 @@ using namespace std;
 
 string_col::string_col(const vector<string>& values) : data(values) {}
 
-void string_col::add_value(const string& value) {
-    data.push_back(value);
-}
-
 const string& string_col::get(size_t index) const {
     if (index >= data.size()) {
         throw out_of_range("Index out of range in string_col");
@@ -48,10 +44,6 @@ string string_col::get_type() const {
 
 int_col::int_col(const vector<int>& values) : data(values) {}
 
-void int_col::add_value(int value) {
-    data.push_back(value);
-}
-
 int int_col::get(size_t index) const {
     if (index >= data.size()) {
         throw out_of_range("Index out of range in int_col");
@@ -78,10 +70,6 @@ string int_col::get_type() const {
 // ==================== Float Column Implementation ====================
 
 float_col::float_col(const vector<double>& values) : data(values) {}
-
-void float_col::add_value(double value) {
-    data.push_back(value);
-}
 
 double float_col::get(size_t index) const {
     if (index >= data.size()) {
@@ -193,29 +181,6 @@ static string infer_type(const vector<string>& values) {
 
 // ==================== Data Frame Implementation ====================
 
-data_frame::data_frame() : num_rows(0) {}
-
-// Move constructor
-data_frame::data_frame(data_frame&& other) noexcept 
-    : columns(std::move(other.columns)),
-      column_order(std::move(other.column_order)),
-      num_rows(other.num_rows) {
-    // Note: mutex cannot be moved, but a new one is default-constructed
-    other.num_rows = 0;
-}
-
-// Move assignment operator
-data_frame& data_frame::operator=(data_frame&& other) noexcept {
-    if (this != &other) {
-        columns = std::move(other.columns);
-        column_order = std::move(other.column_order);
-        num_rows = other.num_rows;
-        // Note: mutex cannot be moved, but we keep the existing one
-        other.num_rows = 0;
-    }
-    return *this;
-}
-
 data_frame data_frame::import_from(const string& path) {
     ifstream file(path);
     if (!file.is_open()) {
@@ -268,49 +233,28 @@ data_frame data_frame::import_from(const string& path) {
         string col_type = infer_type(column_values);
         
         if (col_type == "int") {
-            auto int_column = make_unique<int_col>();
+            vector<int> int_values;
             for (const auto& val : column_values) {
-                if (val.empty()) {
-                    int_column->add_value(0); // Default value for empty
-                } else {
-                    int_column->add_value(stoi(val));
-                }
+                int_values.push_back(val.empty() ? 0 : stoi(val));
             }
-            df.add_column(headers[col_idx], move(int_column));
+            df.column_order.push_back(headers[col_idx]);
+            df.columns[headers[col_idx]] = make_unique<int_col>(int_values);
             
         } else if (col_type == "float") {
-            auto float_column = make_unique<float_col>();
+            vector<double> float_values;
             for (const auto& val : column_values) {
-                if (val.empty()) {
-                    float_column->add_value(0.0); // Default value for empty
-                } else {
-                    float_column->add_value(stod(val));
-                }
+                float_values.push_back(val.empty() ? 0.0 : stod(val));
             }
-            df.add_column(headers[col_idx], move(float_column));
+            df.column_order.push_back(headers[col_idx]);
+            df.columns[headers[col_idx]] = make_unique<float_col>(float_values);
             
         } else {
-            auto string_column = make_unique<string_col>();
-            for (const auto& val : column_values) {
-                string_column->add_value(val);
-            }
-            df.add_column(headers[col_idx], move(string_column));
+            df.column_order.push_back(headers[col_idx]);
+            df.columns[headers[col_idx]] = make_unique<string_col>(column_values);
         }
     }
     
     return df;
-}
-
-void data_frame::add_column(const string& name, unique_ptr<col> column) {
-    if (num_rows == 0) {
-        num_rows = column->size();
-    } else if (column->size() != num_rows) {
-        throw invalid_argument("Column size mismatch: expected " + 
-                                    to_string(num_rows) + " rows");
-    }
-    
-    column_order.push_back(name);
-    columns[name] = move(column);
 }
 
 const col* data_frame::get_column(const string& name) const {
@@ -394,21 +338,6 @@ pair<data_frame, data_frame> data_frame::train_test_split(double test_ratio, uns
     vector<size_t> test_indices(indices.begin() + train_size, indices.end());
     
     return make_pair(get_rows(train_indices), get_rows(test_indices));
-}
-
-data_frame data_frame::copy() const {
-    data_frame new_df;
-    new_df.num_rows = num_rows;
-    
-    for (const auto& col_name : column_order) {
-        auto it = columns.find(col_name);
-        if (it != columns.end()) {
-            new_df.column_order.push_back(col_name);
-            new_df.columns[col_name] = it->second->clone();
-        }
-    }
-    
-    return new_df;
 }
 
 data_frame data_frame::get_rows(const vector<size_t>& indices) const {

@@ -14,7 +14,7 @@ public:
     virtual unique_ptr<col> clone() const = 0;
     virtual size_t size() const = 0;
     virtual string get_type() const = 0;
-    virtual ~col() = default;
+    virtual ~col() {}
 };
 
 // String column implementation
@@ -23,10 +23,8 @@ private:
     vector<string> data;
     
 public:
-    string_col() = default;
     explicit string_col(const vector<string>& values);
     
-    void add_value(const string& value);
     const string& get(size_t index) const;
     const vector<string>& get_data() const;
     
@@ -41,10 +39,8 @@ private:
     vector<int> data;
     
 public:
-    int_col() = default;
     explicit int_col(const vector<int>& values);
     
-    void add_value(int value);
     int get(size_t index) const;
     const vector<int>& get_data() const;
     
@@ -59,10 +55,8 @@ private:
     vector<double> data;
     
 public:
-    float_col() = default;
     explicit float_col(const vector<double>& values);
     
-    void add_value(double value);
     double get(size_t index) const;
     const vector<double>& get_data() const;
     
@@ -78,25 +72,11 @@ class data_frame {
 private:
     map<string, unique_ptr<col>> columns;
     vector<string> column_order;  // To maintain insertion order
-    size_t num_rows;
+    size_t num_rows = 0;
     
 public:
-    data_frame();
-    ~data_frame() = default;
-    
-    // Delete copy constructor and copy assignment (due to unique_ptr in map)
-    data_frame(const data_frame&) = delete;
-    data_frame& operator=(const data_frame&) = delete;
-    
-    // Move constructor and move assignment (for returning by value)
-    data_frame(data_frame&& other) noexcept;
-    data_frame& operator=(data_frame&& other) noexcept;
-    
     // Import from CSV file - returns a new data_frame
     static data_frame import_from(const string& path);
-    
-    // Add a column to the data frame
-    void add_column(const string& name, unique_ptr<col> column);
     
     // Get a column by name (returns nullptr if not found)
     const col* get_column(const string& name) const;
@@ -117,10 +97,7 @@ public:
     // Returns pair: (training_data, test_data)
     pair<data_frame, data_frame> train_test_split(double test_ratio = 0.2, unsigned int seed = 42) const;
     
-    // Function to make a copy of this data_frame
-    data_frame copy() const;
-    
-    // Get a subset of rows (useful for sampling/splitting)
+    // Get a subset of rows (used internally for train_test_split)
     data_frame get_rows(const vector<size_t>& indices) const;
     
     // Print basic info about the dataframe

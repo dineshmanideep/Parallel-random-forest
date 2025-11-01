@@ -1,5 +1,9 @@
 # Scope of the project / ideas etc.
 
+Resource: https://developers.google.com/machine-learning/decision-forests
+
+Palmer Penguins Dataset: https://allisonhorst.github.io/palmerpenguins/articles/intro.html
+
 File structurae
 parallel-random-forest/
 ├── CMakeLists.txt
@@ -30,6 +34,8 @@ parallel-random-forest/
 
 Limitations
 1. Only classification tasks
+2. Only axis-alignend splits
+3. Only binary decision trees
 
 
 
