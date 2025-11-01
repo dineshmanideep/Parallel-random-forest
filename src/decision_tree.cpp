@@ -8,8 +8,31 @@ Serial Decision Tree implementation
 #include <limits>
 #include <stdexcept>
 #include <set>
+#include <omp.h>
 
 using namespace std;
+
+// Helper: Determine if we should parallelize at this node
+static bool should_parallelize(
+    int current_depth,
+    size_t n_samples,
+    const tree_growing_config* config
+) {
+    if (!config || !config->use_parallel) return false;
+    
+    // Don't parallelize if config values are invalid
+    if (config->max_parallel_depth <= 0 || config->min_samples_for_parallel <= 0) {
+        return false;
+    }
+    
+    // Stop if too deep (prevents task explosion)
+    if (current_depth >= config->max_parallel_depth) return false;
+    
+    // Stop if node too small (overhead > benefit)
+    if ((int)n_samples < config->min_samples_for_parallel) return false;
+    
+    return true;
+}
 
 // ==================== Training ====================
 
@@ -52,7 +75,19 @@ void decision_tree::fit(
     }
     
     // Build tree recursively
-    root = build_tree(df, indices, 0);
+    if (growing_config && growing_config->use_parallel) {
+        // Create parallel region for task-based parallelism
+        #pragma omp parallel
+        {
+            #pragma omp single
+            {
+                root = build_tree(df, indices, 0);
+            }
+        }
+    } else {
+        // Sequential execution
+        root = build_tree(df, indices, 0);
+    }
 }
 
 // ==================== Tree Building ====================
@@ -210,11 +245,39 @@ unique_ptr<decision_tree::TreeNode> decision_tree::build_tree(
     }
     
     // Recursively build left and right subtrees
-    if (!left_indices.empty()) {
-        node->left = build_tree(df, left_indices, current_depth + 1);
-    }
-    if (!right_indices.empty()) {
-        node->right = build_tree(df, right_indices, current_depth + 1);
+    bool parallelize = should_parallelize(current_depth, indices.size(), growing_config);
+    
+    if (parallelize) {
+        // Parallel task-based execution
+        unique_ptr<TreeNode> left_child, right_child;
+        
+        #pragma omp task shared(left_child, df) firstprivate(left_indices, current_depth) if(growing_config->use_parallel)
+        {
+            if (!left_indices.empty()) {
+                left_child = build_tree(df, left_indices, current_depth + 1);
+            }
+        }
+        
+        #pragma omp task shared(right_child, df) firstprivate(right_indices, current_depth) if(growing_config->use_parallel)
+        {
+            if (!right_indices.empty()) {
+                right_child = build_tree(df, right_indices, current_depth + 1);
+            }
+        }
+        
+        #pragma omp taskwait  // Wait for both tasks to complete
+        
+        node->left = move(left_child);
+        node->right = move(right_child);
+        
+    } else {
+        // Sequential execution
+        if (!left_indices.empty()) {
+            node->left = build_tree(df, left_indices, current_depth + 1);
+        }
+        if (!right_indices.empty()) {
+            node->right = build_tree(df, right_indices, current_depth + 1);
+        }
     }
     
     return node;
@@ -236,13 +299,13 @@ pair<double, double> decision_tree::find_best_numerical_split(
     
     if (auto int_feat = dynamic_cast<const int_col*>(feature_col)) {
         const auto& data = int_feat->get_data();
-        for (size_t idx : indices) {
-            values_and_labels.push_back({static_cast<double>(data[idx]), encoded_labels[idx]});
+        for (size_t i = 0; i < indices.size(); ++i) {
+            values_and_labels.push_back({static_cast<double>(data[indices[i]]), encoded_labels[i]});
         }
     } else if (auto float_feat = dynamic_cast<const float_col*>(feature_col)) {
         const auto& data = float_feat->get_data();
-        for (size_t idx : indices) {
-            values_and_labels.push_back({data[idx], encoded_labels[idx]});
+        for (size_t i = 0; i < indices.size(); ++i) {
+            values_and_labels.push_back({data[indices[i]], encoded_labels[i]});
         }
     } else {
         throw runtime_error("Expected numerical column for numerical split");
@@ -280,9 +343,9 @@ pair<double, double> decision_tree::find_best_numerical_split(
         
         // Calculate gain based on criterion
         double gain = 0.0;
-        if (growing_config->criterion == tree_growing_config::SplitCriterion::GINI) {
+        if (growing_config && growing_config->criterion == tree_growing_config::SplitCriterion::GINI) {
             gain = metrics::gini_gain(parent_labels, left_labels, right_labels, num_classes);
-        } else { // SHANNON_ENTROPY
+        } else { // SHANNON_ENTROPY or no config
             gain = metrics::entropy_gain(parent_labels, left_labels, right_labels, num_classes);
         }
         
@@ -335,9 +398,9 @@ pair<double, string> decision_tree::find_best_categorical_split(
         
         // Calculate gain
         double gain = 0.0;
-        if (growing_config->criterion == tree_growing_config::SplitCriterion::GINI) {
+        if (growing_config && growing_config->criterion == tree_growing_config::SplitCriterion::GINI) {
             gain = metrics::gini_gain(parent_labels, left_labels, right_labels, num_classes);
-        } else { // SHANNON_ENTROPY
+        } else { // SHANNON_ENTROPY or no config
             gain = metrics::entropy_gain(parent_labels, left_labels, right_labels, num_classes);
         }
         

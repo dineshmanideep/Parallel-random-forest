@@ -3,6 +3,8 @@
 
 #include "loaders.hpp"
 #include "metrics.hpp"
+
+#include <omp.h>
 #include <vector>
 #include <memory>
 
@@ -23,6 +25,11 @@ struct tree_growing_config {
     
     SplitCriterion criterion = SplitCriterion::GINI;
     int max_features_per_split = -1;  // -1 = use all features (for future random forest)
+    
+    // Parallelism configuration
+    bool use_parallel = false;           // Enable tree-level parallelism
+    int min_samples_for_parallel = 100;  // Minimum samples in node to spawn parallel tasks
+    int max_parallel_depth = 8;          // Maximum depth to spawn tasks (prevents task explosion)
 };
 
 class decision_tree {

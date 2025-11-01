@@ -19,7 +19,7 @@ sudo apt-get install cmake        # for building
 ## Running Instructions
 
 ```bash
-
+mkdir build          # create build/ folder
 cmake -S . -B build  # build Makefiles for the compiler
 cmake --build build  # build the actual app
 ./build/bin/forests  # run the app

@@ -89,6 +89,13 @@ private:
     size_t num_rows = 0;
     
 public:
+    // Allow move, prevent copy
+    data_frame() = default;
+    data_frame(data_frame&&) = default;
+    data_frame& operator=(data_frame&&) = default;
+    data_frame(const data_frame&) = delete;
+    data_frame& operator=(const data_frame&) = delete;
+    
     // Import from CSV file - returns a new data_frame
     static data_frame import_from(const string& path);
     
