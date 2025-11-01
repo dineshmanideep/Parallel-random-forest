@@ -5,8 +5,8 @@
 
 int main() {
     int n = omp_get_num_threads();
-    printf("Hello World! Threads are %d\n", n);
+    cout << "Hello World! Threads are " << n << endl;
 
-    data_frame df;
-    df.hello();
+    data_frame df = data_frame::import_from("dataset/test.csv");
+    cout << df.get_string_column("TestString")->get(1) << endl;
 }

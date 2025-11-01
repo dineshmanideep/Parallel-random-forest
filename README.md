@@ -1,5 +1,7 @@
 # Parallel-random-forest
 
+Parallel random forests and decision trees implementaiton to study parallelization speedup of these processes.
+
 ---
 
 ## Dependencies
