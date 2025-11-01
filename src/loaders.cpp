@@ -2,7 +2,7 @@
 Handles simple loading CSVs for dataset
 */
 
-#include "loaders.h"
+#include "loaders.hpp"
 #include <fstream>
 #include <sstream>
 #include <iostream>
@@ -10,6 +10,7 @@ Handles simple loading CSVs for dataset
 #include <random>
 #include <stdexcept>
 #include <cctype>
+#include <set>
 
 using namespace std;
 
@@ -26,6 +27,63 @@ const string& string_col::get(size_t index) const {
 
 const vector<string>& string_col::get_data() const {
     return data;
+}
+
+void string_col::fit_encoding() const {
+    set<string> unique_values(data.begin(), data.end());
+    
+    idx_to_value.clear();
+    value_to_idx.clear();
+    
+    int idx = 0;
+    for (const auto& val : unique_values) {
+        value_to_idx[val] = idx;
+        idx_to_value.push_back(val);
+        idx++;
+    }
+    
+    encoding_fitted = true;
+}
+
+int string_col::encode(const string& value) const {
+    if (!encoding_fitted) {
+        throw runtime_error("Encoding not fitted. Call fit_encoding() first.");
+    }
+    
+    auto it = value_to_idx.find(value);
+    if (it == value_to_idx.end()) {
+        throw invalid_argument("Value not found in encoding: " + value);
+    }
+    return it->second;
+}
+
+string string_col::decode(int idx) const {
+    if (!encoding_fitted) {
+        throw runtime_error("Encoding not fitted. Call fit_encoding() first.");
+    }
+    
+    if (idx < 0 || idx >= (int)idx_to_value.size()) {
+        throw out_of_range("Index out of range in decode: " + to_string(idx));
+    }
+    return idx_to_value[idx];
+}
+
+int string_col::get_encoded(size_t index) const {
+    if (index >= data.size()) {
+        throw out_of_range("Index out of range in get_encoded");
+    }
+    return encode(data[index]);
+}
+
+size_t string_col::num_unique_values() const {
+    if (!encoding_fitted) {
+        throw runtime_error("Encoding not fitted. Call fit_encoding() first.");
+    }
+    return idx_to_value.size();
+}
+
+bool string_col::has_encoding() const {
+    return encoding_fitted;
 }
 
 unique_ptr<col> string_col::clone() const {
@@ -96,7 +154,6 @@ string float_col::get_type() const {
 
 // ==================== Helper Functions ====================
 
-// Trim whitespace from both ends of a string
 static string trim(const string& str) {
     size_t first = str.find_first_not_of(" \t\r\n");
     if (first == string::npos) return "";
@@ -104,7 +161,6 @@ static string trim(const string& str) {
     return str.substr(first, last - first + 1);
 }
 
-// Parse a CSV line considering quoted fields
 static vector<string> parse_csv_line(const string& line) {
     vector<string> fields;
     string field;
@@ -127,7 +183,6 @@ static vector<string> parse_csv_line(const string& line) {
     return fields;
 }
 
-// Determine if a string is an integer
 static bool is_integer(const string& str) {
     if (str.empty()) return false;
     
@@ -143,7 +198,6 @@ static bool is_integer(const string& str) {
     return true;
 }
 
-// Determine if a string is a float
 static bool is_float(const string& str) {
     if (str.empty()) return false;
     
@@ -152,7 +206,6 @@ static bool is_float(const string& str) {
     return end != str.c_str() && *end == '\0';
 }
 
-// Infer the type of a column from sample values
 static string infer_type(const vector<string>& values) {
     if (values.empty()) return "string";
     
@@ -160,7 +213,7 @@ static string infer_type(const vector<string>& values) {
     bool could_be_float = true;
     
     for (const auto& val : values) {
-        if (val.empty()) continue; // Skip empty values for type inference
+        if (val.empty()) continue;
         
         if (could_be_int && !is_integer(val)) {
             could_be_int = false;
@@ -190,7 +243,6 @@ data_frame data_frame::import_from(const string& path) {
     data_frame df;
     string line;
     
-    // Read header
     if (!getline(file, line)) {
         throw runtime_error("Empty file or no header: " + path);
     }
@@ -198,7 +250,6 @@ data_frame data_frame::import_from(const string& path) {
     vector<string> headers = parse_csv_line(line);
     size_t num_cols = headers.size();
     
-    // Store all rows temporarily to infer types
     vector<vector<string>> all_rows;
     
     while (getline(file, line)) {
@@ -223,7 +274,6 @@ data_frame data_frame::import_from(const string& path) {
     
     df.num_rows = all_rows.size();
     
-    // Infer type for each column and create appropriate column objects
     for (size_t col_idx = 0; col_idx < num_cols; ++col_idx) {
         vector<string> column_values;
         for (const auto& row : all_rows) {
@@ -321,7 +371,6 @@ pair<data_frame, data_frame> data_frame::train_test_split(double test_ratio, uns
         throw invalid_argument("test_ratio must be between 0 and 1");
     }
     
-    // Create shuffled indices
     vector<size_t> indices(num_rows);
     for (size_t i = 0; i < num_rows; ++i) {
         indices[i] = i;
@@ -330,7 +379,6 @@ pair<data_frame, data_frame> data_frame::train_test_split(double test_ratio, uns
     mt19937 rng(seed);
     shuffle(indices.begin(), indices.end(), rng);
     
-    // Split indices
     size_t test_size = static_cast<size_t>(num_rows * test_ratio);
     size_t train_size = num_rows - test_size;
     
@@ -350,7 +398,6 @@ data_frame data_frame::get_rows(const vector<size_t>& indices) const {
         
         const col* column = it->second.get();
         
-        // Handle different column types
         if (auto str_col = dynamic_cast<const string_col*>(column)) {
             vector<string> values;
             const auto& data = str_col->get_data();

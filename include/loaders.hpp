@@ -22,11 +22,25 @@ class string_col : public col {
 private:
     vector<string> data;
     
+    // Encoding structures (built on demand via fit_encoding)
+    // Mutable to allow lazy initialization on const objects
+    mutable map<string, int> value_to_idx;
+    mutable vector<string> idx_to_value;
+    mutable bool encoding_fitted = false;
+    
 public:
     explicit string_col(const vector<string>& values);
     
     const string& get(size_t index) const;
     const vector<string>& get_data() const;
+    
+    // Encoding API
+    void fit_encoding() const;  // Build encoding from unique values in data
+    int encode(const string& value) const;  // Convert string -> int (throws if not found)
+    string decode(int idx) const;  // Convert int -> string (throws if out of range)
+    int get_encoded(size_t index) const;  // Get encoded value at row index
+    size_t num_unique_values() const;  // Number of unique values (after fit_encoding)
+    bool has_encoding() const;  // Check if encoding is fitted
     
     unique_ptr<col> clone() const override;
     size_t size() const override;

@@ -36,6 +36,7 @@ Limitations
 1. Only classification tasks
 2. Only axis-alignend splits
 3. Only binary decision trees
+4. No missing values
 
 
 
@@ -60,7 +61,9 @@ Limitations
     Cons: needs orchestration (keeping frontier), and data duplication overhead.
 
 
-Parallelizing Forests -> tree level parallelism
+Parallelizing Forests 
+-> tree level parallelism
+-> Output stream as a shared resource for logging progress
 
 
 >>> **Metrics for classification**
