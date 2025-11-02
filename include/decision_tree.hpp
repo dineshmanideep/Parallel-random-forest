@@ -3,6 +3,7 @@
 
 #include "loaders.hpp"
 #include "metrics.hpp"
+#include "progress.hpp"
 
 #include <omp.h>
 #include <vector>
@@ -107,6 +108,7 @@ public:
     // Public configuration pointers (user sets these manually)
     tree_hyperparameters* hp_config = nullptr;
     tree_growing_config* growing_config = nullptr;
+    TreeProgress* progress_tracker = nullptr;  // Optional progress tracking
     
     // Training
     void fit(

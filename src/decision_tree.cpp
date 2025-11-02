@@ -74,6 +74,13 @@ void decision_tree::fit(
         indices = *bootstrap_indices;
     }
     
+    // Initialize progress tracker if provided
+    if (progress_tracker) {
+        int max_d = (hp_config ? hp_config->max_depth : -1);
+        int min_samples = (hp_config ? hp_config->min_examples_per_leaf : 1);
+        progress_tracker->initialize(max_d, min_samples, indices.size());
+    }
+    
     // Build tree recursively
     if (growing_config && growing_config->use_parallel) {
         // Create parallel region for task-based parallelism
@@ -88,6 +95,11 @@ void decision_tree::fit(
         // Sequential execution
         root = build_tree(df, indices, 0);
     }
+    
+    // Mark progress as complete
+    if (progress_tracker) {
+        progress_tracker->mark_complete();
+    }
 }
 
 // ==================== Tree Building ====================
@@ -98,6 +110,11 @@ unique_ptr<decision_tree::TreeNode> decision_tree::build_tree(
     int current_depth
 ) {
     auto node = make_unique<TreeNode>();
+    
+    // Track node creation
+    if (progress_tracker) {
+        progress_tracker->increment_nodes();
+    }
     
     // Get encoded labels for these indices
     const col* target_col = df.get_column(target_column_name);

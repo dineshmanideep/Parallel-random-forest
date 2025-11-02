@@ -4,7 +4,13 @@ Resource: https://developers.google.com/machine-learning/decision-forests
 
 Palmer Penguins Dataset: https://allisonhorst.github.io/palmerpenguins/articles/intro.html
 
-File structurae
+## What's parallel about this project
+1. Parallel decision tree     (binary tree divide and conquer problem) done
+2. Parallel random forests    (each tree is a thread) done
+3. Parallel grid search       (training possible hyperparameters parallely to get optimal ones)
+4. Parallel RF progress tracking (careful handling of output streams using omp_lock_t)
+
+## File structurae
 parallel-random-forest/
 ├── CMakeLists.txt
 ├── include/

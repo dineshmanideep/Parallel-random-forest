@@ -7,6 +7,7 @@
 #include "decision_tree.hpp"   // Decision tree
 #include "metrics.hpp"         // Metrics for evaluation
 #include "random_forest.hpp"   // Random forest
+#include "progress.hpp"        // Progress tracking
 
 void test_decision_tree() {
     // Importing dataset
@@ -111,8 +112,8 @@ void test_random_forest() {
 
     // Setting random forest configuration
     random_forest_config config;
-    config.num_trees = 2000;
-    config.bootstrap_sample_ratio = 0.67;
+    config.num_trees = 5000;
+    config.bootstrap_sample_ratio = 0.55;
     config.use_parallel = true;
 
     forest.rf_config = &config;
@@ -134,6 +135,10 @@ void test_random_forest() {
     hp_config.min_examples_per_leaf = 20;
 
     forest.hp_config = &hp_config;
+
+    // Enable progress tracking
+    RandomForestProgress progress;
+    forest.progress_tracker = &progress;
 
     // Fitting forest to training data
     auto time_start = chrono::high_resolution_clock::now();
@@ -160,10 +165,16 @@ void test_random_forest() {
     cout << "Training & evaluation time taken: " << duration.count() << " milliseconds" << endl;
 }
 
+#include <sstream>
+#include <semaphore>
+
 int main() {
-    int n = omp_get_num_threads();
-    cout << "Hello World! OMP Threads are " << n << endl;
+    
+    // Testing random forest with progress tracking
+    test_random_forest();
 
     // Testing decision tree
-    test_random_forest();
+    // test_decision_tree();
+
+    return 0;
 }

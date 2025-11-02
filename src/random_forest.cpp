@@ -75,20 +75,61 @@ void random_forest::fit(
         );
     }
     
+    // Initialize progress tracker if provided
+    if (progress_tracker) {
+        progress_tracker->initialize(num_trees);
+        
+        // Initialize each tree's progress tracker
+        int max_d = (hp_config ? hp_config->max_depth : -1);
+        int min_samples = (hp_config ? hp_config->min_examples_per_leaf : 1);
+        for (int i = 0; i < num_trees; ++i) {
+            progress_tracker->initialize_tree(i, max_d, min_samples, sample_size);
+        }
+    }
+    
     // Train all trees (parallel or sequential based on config)
     if (rf_config->use_parallel) {
         #pragma omp parallel for
         for (int i = 0; i < num_trees; ++i) {
             trees[i].hp_config = hp_config;
             trees[i].growing_config = growing_config;
+            
+            // Link tree to its progress tracker
+            if (progress_tracker) {
+                trees[i].progress_tracker = &(progress_tracker->tree_progresses[i]);
+            }
+            
             trees[i].fit(df, feature_cols, target_col, &bootstrap_samples[i]);
+            
+            // Mark tree complete and update display
+            if (progress_tracker) {
+                progress_tracker->mark_tree_complete(i);
+                progress_tracker->print_progress();
+            }
         }
     } else {
         for (int i = 0; i < num_trees; ++i) {
             trees[i].hp_config = hp_config;
             trees[i].growing_config = growing_config;
+            
+            // Link tree to its progress tracker
+            if (progress_tracker) {
+                trees[i].progress_tracker = &(progress_tracker->tree_progresses[i]);
+            }
+            
             trees[i].fit(df, feature_cols, target_col, &bootstrap_samples[i]);
+            
+            // Mark tree complete and update display
+            if (progress_tracker) {
+                progress_tracker->mark_tree_complete(i);
+                progress_tracker->print_progress();
+            }
         }
+    }
+    
+    // Finalize progress display
+    if (progress_tracker) {
+        progress_tracker->finish();
     }
 }
 

@@ -2,6 +2,7 @@
 #define RANDOM_FOREST_H
 
 #include "decision_tree.hpp"
+#include "progress.hpp"
 #include <vector>
 
 using namespace std;
@@ -31,6 +32,7 @@ public:
     tree_hyperparameters* hp_config = nullptr;
     tree_growing_config* growing_config = nullptr;
     random_forest_config* rf_config = nullptr;
+    RandomForestProgress* progress_tracker = nullptr;  // Optional progress tracking
     
     // Training
     void fit(
