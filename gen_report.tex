@@ -1,0 +1,213 @@
+\documentclass[conference]{IEEEtran}
+\IEEEoverridecommandlockouts
+\usepackage{cite}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{algorithmic}
+\usepackage{graphicx}
+\usepackage{textcomp}
+\usepackage{xcolor}
+\usepackage{fancyhdr}
+\def\BibTeX{{\rm B\kern-.05em{\sc i\kern-.025em b}\kern-.08em
+    T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
+
+% Header configuration
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[R]{\small NITK, Surathkal - Dept. of Information Technology - IT302}
+\fancyfoot[C]{\thepage}
+
+\begin{document}
+
+% Cover Page
+\begin{titlepage}
+ \begin{center}
+	IT302 Parallel Computing Project Report on\\
+	\null
+	\textbf{\large \textbf{Parallel Random Forest Implementation}}\\
+	\null
+	
+	Submitted in partial fulfillment of the requirements for the degree of\\
+	\null
+	BACHELOR OF TECHNOLOGY\\
+	in\\
+	INFORMATION TECHNOLOGY\\
+	
+	by \\
+	\textbf{Hemanth Srinivash Elangovan (Roll No. 231IT026)}\\
+    \textbf{Paluru Pavan Kumar (Roll No. 231IT046)}\\
+    \textbf{Paluvadi Dinesh Manideep (Roll No. 231IT047)}
+	\vspace{0.8em} \\
+	\large{\textit{under the guidance of}} \\
+	\vspace{0.8em}
+	
+	\large{\textbf{Biju R. Mohan}}\\
+	\begin{figure}[h]
+		\centering{
+			\includegraphics[width=6cm, height=6cm]{symbol.jpg}
+		}
+	\end{figure}
+DEPARTMENT OF INFORMATION TECHNOLOGY\\
+NATIONAL INSTITUTE OF TECHNOLOGY KARNATAKA\\
+SURATHKAL, MANGALORE - 575025\\
+\null
+November, 2025\\
+\end{center}
+\end{titlepage}
+
+\begin{abstract}
+This paper presents a parallel implementation of Random Forest classification using OpenMP task-based parallelism. We implement decision trees and random forests from scratch in C++ without external machine learning libraries, utilizing a custom data frame structure. Two levels of parallelism are explored: tree-level parallelism using divide-and-conquer with OpenMP tasks, and forest-level parallelism using parallel for constructs. Experiments on the Dry Bean dataset with 3,848 samples demonstrate that forest-level parallelism achieves a speedup of 4.5-4.85x on a 14-core system, while maintaining model accuracy. Performance analysis across varying tree counts and sample sizes reveals the impact of parallel overhead and optimal parallelization strategies.
+\end{abstract}
+
+\begin{IEEEkeywords}
+Random Forest, OpenMP, Parallel Computing, Decision Trees, Machine Learning
+\end{IEEEkeywords}
+
+\section{Introduction}
+Random forests are ensemble learning methods that construct multiple decision trees during training and aggregate their predictions for classification or regression tasks. While highly accurate, training random forests is computationally intensive, especially with large datasets and numerous trees. Modern multi-core processors provide opportunities to accelerate this training through parallel computing. This work implements random forest classification from the ground up in C++, exploring parallelization strategies at both the individual tree construction level and the forest ensemble level using OpenMP. We evaluate the trade-offs between these approaches, examining speedup characteristics, parallel overhead, and scalability with respect to forest size and dataset dimensions.
+
+\section{Objectives}
+The primary objective is to develop an efficient parallel implementation of random forest classification that maximizes speedup while maintaining model accuracy. We aim to analyze the performance characteristics of tree-level versus forest-level parallelism, understand the conditions under which parallel overhead negatively impacts performance, and establish optimal configurations for different problem sizes. Additionally, we seek to demonstrate that a minimal, library-independent implementation can achieve competitive performance and accuracy through effective parallelization strategies.
+
+\section{Methodology}
+
+\subsection{Decision Trees}
+A decision tree recursively partitions the feature space by selecting splits that minimize impurity. At each node, we evaluate all features and thresholds to find the split that maximizes information gain. The Gini impurity for a node is computed as:
+\begin{equation}
+G = 1 - \sum_{i=1}^{C} p_i^2
+\end{equation}
+where $p_i$ is the proportion of class $i$ samples. For multi-class classification, we employ a one-versus-rest strategy, training binary classifiers for each class and selecting the class with maximum vote.
+
+\subsection{Random Forests}
+Random forests combine multiple decision trees through bagging (bootstrap aggregating). Each tree is trained on a bootstrap sample drawn with replacement from the original dataset. The final prediction aggregates individual tree predictions through majority voting:
+\begin{equation}
+\hat{y} = \text{mode}\{h_1(x), h_2(x), ..., h_T(x)\}
+\end{equation}
+where $h_t(x)$ is the prediction of tree $t$ and $T$ is the total number of trees. Bootstrap sampling introduces diversity among trees, reducing overfitting and improving generalization.
+
+\subsection{Custom Data Frame Implementation}
+Rather than relying on external libraries, we implement a custom data structure for handling tabular data. The data frame stores numerical features in contiguous memory as column-major arrays, enabling efficient cache utilization during tree construction. A custom CSV loader parses the input file, handles categorical label encoding, and constructs the internal representation. This approach provides full control over memory layout and data access patterns, optimizing for our specific parallelization needs.
+
+\subsection{Tree-Level Parallelism}
+Decision tree construction naturally exhibits task-based parallelism. When a node is split, the left and right subtrees can be built independently. We leverage OpenMP tasks to exploit this:
+\begin{verbatim}
+buildNode(node):
+  split = findBestSplit(node)
+  #pragma omp task
+    buildNode(node.left)
+  #pragma omp task
+    buildNode(node.right)
+  #pragma omp taskwait
+\end{verbatim}
+The runtime system dynamically schedules tasks to available threads, balancing load across cores.
+
+\subsection{Forest-Level Parallelism}
+Since trees in a random forest are trained independently, forest construction is embarrassingly parallel. We use OpenMP parallel for:
+\begin{verbatim}
+#pragma omp parallel for
+for (i = 0; i < numTrees; i++)
+  forest[i] = trainTree(bootstrapSample(i))
+\end{verbatim}
+OpenMP automatically divides iterations among threads, minimizing synchronization overhead. This approach is simpler and achieves better load balancing than tree-level parallelism.
+
+\subsection{Progress Bar Implementation}
+To provide user feedback during training, we implement a progress bar that updates as each tree completes. The progress state is encapsulated in a shared structure containing the completion count and total tree count. In parallel execution, multiple threads may complete trees simultaneously, necessitating thread-safe access to this shared state. We employ OpenMP's explicit locking mechanism using \texttt{omp\_lock\_t}:
+\begin{verbatim}
+struct ProgressTracker {
+  int completed;
+  int total;
+  omp_lock_t lock;
+};
+
+omp_set_lock(&progress.lock);
+progress.completed++;
+updateProgressBar(progress.completed, progress.total);
+omp_unset_lock(&progress.lock);
+\end{verbatim}
+The lock ensures mutual exclusion during progress updates, preventing race conditions and garbled console output. However, explicit locking introduces contention as threads serialize at the update point. The overhead from lock acquisition, console I/O, and the associated synchronization delay can measurably impact performance, particularly for smaller workloads where locking frequency approaches the computation time per tree.
+
+\subsection{Model Performance Metrics}
+We evaluate model quality using standard classification metrics. Accuracy measures the fraction of correct predictions. Precision quantifies the proportion of positive predictions that are correct. Recall measures the proportion of actual positives correctly identified. The F1 score provides the harmonic mean of precision and recall:
+\begin{equation}
+F1 = 2 \cdot \frac{\text{Precision} \cdot \text{Recall}}{\text{Precision} + \text{Recall}}
+\end{equation}
+
+\subsection{Parallelism Performance Metrics}
+Speedup quantifies parallel efficiency by comparing execution times:
+\begin{equation}
+\text{Speedup} = \frac{T_{\text{serial}}}{T_{\text{parallel}}}
+\end{equation}
+Ideal linear speedup equals the number of processors. Sublinear speedup results from parallel overhead, load imbalance, and synchronization costs.
+
+\section{Benchmark Results and Graphs}
+
+\subsection{Experimental Setup}
+
+\subsubsection{Dataset}
+We use the Dry Bean dataset for multi-class classification, predicting bean varieties based on morphological features. The dataset contains 3,848 samples with 16 numerical features describing shape, form factor, aspect ratio, and other geometric properties. The output is a categorical variable with seven bean classes. For random forest training, we apply bootstrap sampling with 55\% of samples selected for each tree, introducing diversity while maintaining sufficient training data per tree.
+
+\subsubsection{Hardware Configuration}
+All experiments run on an Intel Core i9-12900H processor with 14 physical cores and 20 logical processors (6 performance cores with hyperthreading and 8 efficiency cores). The processor operates at a 2.5 GHz base frequency. This hybrid architecture provides substantial parallelism for evaluating OpenMP performance characteristics across different workload types.
+
+\subsection{Speedup vs. Number of Trees}
+
+\begin{figure}[htbp]
+\centerline{\includegraphics[width=0.48\textwidth]{pics/figure1_speedup_vs_trees.png}}
+\caption{Speedup comparison across varying forest sizes (2, 10, 100, 200 trees).}
+\label{fig:speedup_trees}
+\end{figure}
+
+Figure \ref{fig:speedup_trees} illustrates how speedup varies with forest size. With only 2 trees, forest-level parallelism achieves a speedup of 0.92x, demonstrating that parallel overhead exceeds computational benefit. The overhead from thread creation and synchronization dominates when individual work units are too small. As tree count increases to 10, 100, and 200, speedup improves to 3.99x, 4.50x, and 4.52x respectively. This demonstrates that parallelization becomes increasingly effective as the granularity of parallelizable work grows. Tree-level parallelism shows modest speedups (1.26-1.31x) across all configurations due to frequent synchronization and load imbalance from irregular tree structures.
+
+\subsection{Speedup vs. Sample Size}
+
+\begin{figure}[htbp]
+\centerline{\includegraphics[width=0.48\textwidth]{pics/figure5_speedup vs samplesize.png}}
+\caption{Speedup characteristics with varying sample sizes (100, 500, 1500, 3500).}
+\label{fig:speedup_samples}
+\end{figure}
+
+Figure \ref{fig:speedup_samples} examines how dataset size affects parallel efficiency. With 100 samples, speedup reaches only 2.71x because the computational work per tree is minimal (206ms serial time), making parallel overhead significant. At 500 samples, speedup peaks at 5.00x as the work-to-overhead ratio improves substantially (4027ms serial time). For larger datasets (1500 and 3500 samples), speedup stabilizes around 4.52-4.85x. The slight decrease from the peak suggests that memory bandwidth contention and cache effects become limiting factors as computational intensity increases. These results indicate an optimal regime exists where parallelization benefits are maximized.
+
+\subsection{Progress Bar Overhead Impact}
+
+\begin{figure}[htbp]
+\centerline{\includegraphics[width=0.48\textwidth]{pics/figure2_progress_bar_overhead.png}}
+\caption{Performance comparison with and without progress bar visualization.}
+\label{fig:progress_bar}
+\end{figure}
+
+Figure \ref{fig:progress_bar} quantifies the cost of progress bar visualization during training. For 100-tree forests, the configuration without progress bars achieves 29.4s execution time compared to 28.1s with progress bars, representing a 4.6\% performance degradation. Progress bar updates require mutex locks for thread-safe console output, introducing contention. While the overhead is relatively modest, it demonstrates that even seemingly minor instrumentation can measurably impact performance in parallel applications. For production systems where training time is critical, disabling visual feedback provides marginal but consistent improvements.
+
+\subsection{Accuracy: Decision Tree vs. Random Forest}
+
+\begin{figure}[htbp]
+\centerline{\includegraphics[width=0.48\textwidth]{pics/figure3_accuracy_comparison.png}}
+\caption{Model accuracy comparison between single decision tree and 200-tree random forest.}
+\label{fig:accuracy}
+\end{figure}
+
+Figure \ref{fig:accuracy} demonstrates the accuracy improvement from ensemble methods. A single decision tree achieves 89.85\% accuracy with an F1 score of 0.919. In contrast, a random forest with 200 trees reaches 91.91\% accuracy with an F1 score of 0.933. The 2.06 percentage point improvement illustrates how aggregating diverse models reduces overfitting and captures more complex decision boundaries. The random forest's bootstrap sampling and vote aggregation smooth out individual tree idiosyncrasies, resulting in more robust predictions. This accuracy gain justifies the additional computational cost, especially when parallelization mitigates training time overhead.
+
+\subsection{Comprehensive Speedup Analysis}
+
+\begin{figure}[htbp]
+\centerline{\includegraphics[width=0.48\textwidth]{pics/figure4_comprehensive_speedup.png}}
+\caption{Comprehensive speedup comparison across all experimental configurations.}
+\label{fig:comprehensive}
+\end{figure}
+
+Figure \ref{fig:comprehensive} synthesizes all speedup measurements across tree counts, sample sizes, and parallelization strategies. Forest-level parallelism consistently outperforms tree-level approaches across all scenarios. The visualization reveals that optimal speedup (4.5-5.0x) occurs in the mid-range of both tree count and sample size parameters. Very small workloads suffer from parallel overhead, while very large workloads encounter diminishing returns from hardware constraints. This comprehensive view guides practical deployment: forest-level parallelism with 100-200 trees and 1500-3500 samples provides the best performance-accuracy trade-off on the tested hardware.
+
+\section{Conclusion}
+This work demonstrates that OpenMP-based parallelization can significantly accelerate random forest training while maintaining model accuracy. Forest-level parallelism, exploiting the independence of tree construction, achieves 4.5-4.85x speedup on a 14-core system with minimal implementation complexity. The analysis reveals critical insights: parallel overhead dominates for small workloads (2 trees or 100 samples), optimal speedup occurs in mid-range configurations, and synchronization costs from instrumentation like progress bars measurably impact performance. The implementation validates that library-independent approaches can achieve competitive results through careful parallelization design. We acknowledge the resources provided by Google's Machine Learning Crash Course on Decision Forests, which informed our algorithmic approach.
+
+\begin{thebibliography}{00}
+\bibitem{b1} Google Developers, ``Machine Learning Decision Forests,'' Google Machine Learning Crash Course, 2024. [Online]. Available: https://developers.google.com/machine-learning/decision-forests
+\bibitem{b2} L. Breiman, J. H. Friedman, R. A. Olshen, and C. J. Stone, ``Classification and Regression Trees,'' Wadsworth International Group, Belmont, CA, 1984.
+\bibitem{b3} L. Breiman, ``Random Forests,'' \textit{Machine Learning}, vol. 45, no. 1, pp. 5-32, 2001.
+\bibitem{b4} OpenMP Architecture Review Board, ``OpenMP Application Programming Interface Version 5.0,'' OpenMP ARB, 2018.
+\bibitem{b5} G. M. Amdahl, ``Validity of the Single Processor Approach to Achieving Large Scale Computing Capabilities,'' \textit{Proceedings of AFIPS Spring Joint Computer Conference}, pp. 483-485, 1967.
+\end{thebibliography}
+
+\end{document}
+
