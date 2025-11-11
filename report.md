@@ -17,7 +17,8 @@ Introduction
 6. Model performance metrics
 7. Parallelism performance metrics (only speedup)
 
-# Benchmark Results and Graphs
+# Benchmark Results and Graphs 
+(each will have some text introducing why this results are important, then a graph image, then the results)
 1. Speedup discussion between varying number of trees (with progress bar) (2, 10, 100, 200 trees)
 2. Speedup discussion between varying number of samples (100, 500, 1500, 3500)
  - one graph fixed for 
