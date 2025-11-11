@@ -47,6 +47,7 @@ BenchmarkResult run_random_forest_benchmark(
 // Benchmark suite functions
 void benchmark_decision_tree(const DatasetConfig& dataset_config);
 void benchmark_random_forest(const DatasetConfig& dataset_config, int num_trees);
+void benchmark_sample_sizes(const DatasetConfig& dataset_config, int num_trees);
 
 // Utility functions
 void print_benchmark_table(const std::vector<BenchmarkResult>& results);

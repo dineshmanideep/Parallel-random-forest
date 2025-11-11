@@ -1,9 +1,12 @@
 Notes:
 1. Each page of report should have a header text (on the side): 
     NITK, Surathkal - Dept. of Information Technology - IT302
-2. No actual C++ code
+2. No actual C++ code, when pseudocode is required, make it very short
+3. Whole report must fit in 4 pages ATMOST.
+4. Be concise, straight to the point and not many buzz words.
 
-## Sections
+
+Sections
 
 # Introduction
 Introduction 
@@ -18,6 +21,14 @@ Introduction
 7. Parallelism performance metrics (only speedup)
 
 # Benchmark Results and Graphs 
+
+## About Dataset
+Dry beans prediction - predict type of bean based on some classifications
+3848 samples
+16 numerical features
+categorical output feature
+
+## Benchmarks
 (each will have some text introducing why this results are important, then a graph image, then the results)
 1. Speedup discussion between varying number of trees (with progress bar) (2, 10, 100, 200 trees)
 2. Speedup discussion between varying number of samples (100, 500, 1500, 3500)
@@ -26,7 +37,9 @@ Introduction
 4. Accuracy discussion between single decision tree and random forest of 200 trees
 
 # Conclusion
-Ending notes and acknowledgements, google course etc.
+Ending notes and acknowledgements, google course thanks etc.
+https://developers.google.com/machine-learning/decision-forests
+(No future work and all)
 
 # References
 

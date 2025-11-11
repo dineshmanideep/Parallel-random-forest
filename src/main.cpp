@@ -54,6 +54,7 @@ void menu() {
     cout << "\nChoose mode:" << endl;
     cout << "1. Manual (configure parallelism options)" << endl;
     cout << "2. Benchmark (test all parallelism configurations)" << endl;
+    cout << "3. Sample Size Benchmark (test different dataset sizes)" << endl;
     cout << "Enter your choice: ";
     
     int modeChoice;
@@ -124,6 +125,37 @@ void menu() {
             // Decision Tree Benchmark
             benchmark_decision_tree(dataset_config);
             
+        } else {
+            cout << "Invalid choice!" << endl;
+            exit(1);
+        }
+        
+    } else if (modeChoice == 3) {
+        // SAMPLE SIZE BENCHMARK MODE
+        if (testChoice == 1) {
+            // Random Forest Sample Size Benchmark
+            cout << "\n--- Sample Size Benchmark Configuration ---" << endl;
+            cout << "This will test sample sizes: 100, 500, 1500, 3500" << endl;
+            cout << "Enter the number of trees: ";
+            int numTrees;
+            cin >> numTrees;
+
+            if (numTrees <= 0) {
+                cout << "Invalid number of trees! Using default: 50" << endl;
+                numTrees = 50;
+            }
+
+            // Only works with Dry Bean dataset
+            if (datasetChoice != 3) {
+                cout << "\nWarning: Sample size benchmark is designed for Dry Bean dataset (option 3)." << endl;
+                cout << "Results may not be meaningful for other datasets." << endl;
+            }
+
+            benchmark_sample_sizes(dataset_config, numTrees);
+            
+        } else if (testChoice == 2) {
+            cout << "Sample size benchmark is only available for Random Forest (option 1)." << endl;
+            exit(1);
         } else {
             cout << "Invalid choice!" << endl;
             exit(1);
