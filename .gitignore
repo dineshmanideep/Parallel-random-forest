@@ -2,3 +2,4 @@ build/
 .vscode/
 .cursor/
 notes.md
+node_modules/
